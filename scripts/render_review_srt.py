@@ -2,7 +2,15 @@
 """Render deterministic review SRT and cue map from merged cues."""
 import argparse
 import json
+import sys
 from pathlib import Path
+
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
 def stamp(value):
     millis = max(0, round(float(value) * 1000))

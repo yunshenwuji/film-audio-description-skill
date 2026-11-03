@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
 DIRS = [
     "media", "materials/character-references", "materials/subtitles", "timeline", "bible", "segments", "script",
@@ -31,6 +39,8 @@ def main():
     p.add_argument("project_dir")
     p.add_argument("source_media")
     p.add_argument("--title")
+    p.add_argument("--script-only", action="store_true",
+                    help="Script-only delivery: skip narration/mix outputs and TTS-related preferences questions.")
     args = p.parse_args()
     root = Path(args.project_dir).resolve()
     source = Path(args.source_media).resolve()
@@ -49,10 +59,10 @@ def main():
         "approved_script_version": None,
         "batch_approvals": [],
         "preferences": DEFAULTS,
-        "outputs": ["review_script", "machine_script", "narration_track", "mixed_video", "quality_report"]
+        "outputs": ["review_script", "machine_script", "uncertainty_report"] if args.script_only else ["review_script", "machine_script", "narration_track", "mixed_video", "quality_report"]
     }
     write_json(root / "project.json", project)
-    for name, empty in [("characters", []), ("locations", []), ("objects", []), ("story-state", {})]:
+    for name, empty in [("characters", {"characters": []}), ("locations", {"locations": []}), ("objects", {"objects": []}), ("story-state", {"story-state": {}})]:
         write_json(root / "bible" / f"{name}.json", empty)
     write_json(root / "materials" / "manifest.json", {"schema_version": 1, "artifacts": [], "skipped_steps": [], "conflicts": []})
     print(root)

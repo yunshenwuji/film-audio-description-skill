@@ -4,6 +4,13 @@ import json
 import sys
 from pathlib import Path
 
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
 def main():
     p = argparse.ArgumentParser(description="Audit time-coded audio-description cues.")
     p.add_argument("cue_json")

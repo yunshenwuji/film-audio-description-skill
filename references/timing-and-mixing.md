@@ -8,9 +8,9 @@ For each cue, record the visual-event time, available slot, actual synthesized f
 
 ## Placement order
 
-Try these options in order:
+Run `scripts/optimize_placement.py PROJECT_DIR` to execute the move → shorten → rate part of this order deterministically on the merged draft; it records every attempt in `placement_attempts` and writes `qc/placement-optimisation.json`. Splitting (step 3) is a semantic judgment — it is only performed by the coordinator when two visual moments genuinely support two cues, applied through `scripts/continuity_editor.py`, and never invented automatically. Try these options in order:
 
-1. Place the cue in a genuine nearby gap while keeping it close enough to the visual event.
+1. Place the cue in a genuine nearby gap while keeping it close enough to the visual event. A cue displaced more than 5 seconds from its event (15 for location changes and title credits) must carry `displacement_justification` describing the documented conflict.
 2. Rewrite to retain subject + concrete action and remove lower-priority detail.
 3. Split only when two visual moments naturally support two cues.
 4. Increase speech rate modestly after measuring the actual voice; stay within the approved maximum.

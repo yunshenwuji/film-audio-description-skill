@@ -4,6 +4,56 @@
 
 本文件记录所有重要变更，格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 和[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.0] - 2026-11-03
+
+### 新增
+
+- 新增 merge_draft.py：从分段 cue 构建规范事实源 `script/merged-draft.json`（逐条带 `derivation` 出处、覆盖并集、互压检测），`merged_edits` 护栏防止未编辑稿被静默重建。
+- 新增 converge_identities.py：应用协调者身份映射，吸收 provisional id，按掩码优先顺序改写标签，登记带校验的 `label_variants`，生成 `qc/identity-convergence.json`（单 `review_range` 或并集覆盖批次的 `review_ranges` 分块）。
+- 新增 optimize_placement.py：在合并稿上按“先移动、再缩短、最后提语速”顺序落位并记录每次尝试。
+- 新增 continuity_editor.py：按 cue id（绝不按排序位置）应用可审计的改写/删除/移动。
+- 新增 contact_sheet.py：基于 Pillow 的带标签联络表（避开 FFmpeg `drawtext`/`pattern_type glob` 兼容性陷阱）。
+- 新增 segment_brief.py：从工作包生成不含 sha 的紧凑代理简报。
+- 新增 merge_bible.py：`collect`/`apply` 把分段 bible 提案合并为规范 bible 文件。
+- init_project.py 新增 `--script-only`（仅出稿输出），问卷新增交付形态题。
+- audit_project.py 新增按 mtime+size 的哈希缓存（`qc/hash-cache.json`），不再每次全量重读几 GB 源文件。
+- prepare_segment.py 现在校验 `segment-NNN` 命名、把近尾采样钳制到最后可解码帧之前（ffprobe）、末采样失败自动前移重试、`--force` 重建时清理孤儿帧、并把 bible 快照规范化为对象带键形状。
+- finalize_segment.py 现在校验段 id、透传 `displacement_justification` 并在位移超标时告警。
+- 所有内置脚本把 stdout/stderr 重配置为 UTF-8，适配 Windows 控制台。
+
+### 变更
+
+- `script/merged-draft.json` 成为规范脚本工件：审计对合并 cue 检查对白重述、总结漂移、位移、字幕卡匹配、身份标签与审稿文件对齐，分段文件保持为只读证据层；合并 cue 必须带 `derivation` 出处。
+- 密度漂移闸门改用叙事分段中位数做基准，片头/片尾字幕段豁免漂移比较。
+- 证据回收判定只罚同主体复用；一帧多主体可按主体分别建观察。
+- `first_speech_once` 模式下主要人物必须建立 `first_spoken_line_time` 或留 `speech_evidence_reviewed` 记录，静默省略视为审计失败。
+- 已登记 `label_variants` 残留在 cue 文本中产生审计警告；过短或泛称变体在收敛时被拒绝。
+- bible 文件统一为对象带键顶层形状；init/merge_bible 写入新形状，prepare 做规范化，审计仍兼容旧列表。
+- 收敛报告允许以 `review_ranges` 分块覆盖单个审稿批次（分块必须连续，内部空洞会被审计拦截）。
+- 审稿阶段审计报错附带修复提示；新增 `scene_table_too_fine` 警告防场景表过细。
+- 对下游消费者的契约变更：审计报告 schema_version 升至 3；全部脚本 stdout/stderr 重配置为 UTF-8（旧代码页下的 subprocess 消费者请设 PYTHONIOENCODING=utf-8）。
+- optimize_placement.py 实际执行“先移动、再缩短、最后提语速”；拆分是协调者的语义判断，经 continuity_editor.py 手动执行，不再自动发明。
+- 首说话身份分层闸门（character_speech_timing_unestablished）只在审稿阶段强制执行。
+
+### 修复
+
+- 非 `segment-*` 命名的分段不再被审计静默跳过——工具在打包入口直接拒绝。
+- 合并稿编辑不再需要脆弱的回写步骤，也不再误报 `review_srt_text_or_id_mismatch`。
+- `displacement_justification` 在整条管线中可表达，不再只存在于审计代码里。
+- 重打包加密度后的孤儿帧会被清理，不再污染按目录 glob 的下游。
+- 末采样抽取不再让 FFmpeg mjpeg 编码器在文件尾崩溃。
+- 2 分钟的片头字幕单元不再抬高全片漂移基准、逼片尾滚动区灌覆盖记录。
+- 修复末采样重试路径写到旧文件名后读取不存在路径的崩溃：重试帧先改名再入索引。
+- 修复掩码替换在被引用人物的标签互为子串时（如 衬衫男人/花衬衫男人）串号：所有标签按长度全局降序掩码。
+- 修复被吸收的 provisional id 残留在 cue subject_character_ids：收敛时原位改写成 canonical id。
+- 修复 merge_bible apply 先写后验：孤儿校验通过前不再覆盖规范 bible。
+- 修复收敛范围闸门放过内部空洞，审计新增 nonstandard_segment_directory 告警而非静默忽略非标目录。
+- 修复哈希缓存忽略 ctime、提语速路径 review_duration/available_slot 不同步、联络表索引忽略 --timestamps 覆盖值。
+
+### 验证
+
+- 新增管线工具测试（合并出处、掩码收敛、落位顺序、简报、bible 合并、连贯性编辑）与新审计闸门测试（中位数漂移、同帧不同主体、出处、变体、收敛分块、说话人分层、哈希缓存、过细场景表）。
+
 ## [0.5.0] - 2026-11-01
 
 ### 新增

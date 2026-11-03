@@ -294,5 +294,169 @@ class AuditProjectTests(unittest.TestCase):
                   {"role":"action","text":"抬手","priority":"required"}]}]})
             self.assertIn("obsolete_neutral_label_after_identity_reveal", {x["type"] for x in MODULE.audit(root)["issues"]})
 
+    def test_drift_gate_uses_median_and_exempts_credit_segments(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            # segment-00: short, dense, title-credit cues -> exempt from drift baseline
+            write(root / "segments/segment-00/manifest.json", {"start": 0, "end": 120, "status": "drafted"})
+            write(root / "segments/segment-00/observations.json", {"observations": [observation(i, t, t + 10) for i, t in enumerate((0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110), 1)]})
+            write(root / "segments/segment-00/draft-cues.json", {"cues": [{"id": "c0", "start": 0, "text": "某某影业有限公司。",
+                  "observation_ids": ["obs-1"], "evidence_frames": [0, 1, 2], "evidence_ids": ["frame-0", "frame-1", "frame-2"],
+                  "visual_event_time": 0, "visual_event_type": "title_credit", "temporal_displacement": 0,
+                  "atomic_facts": [{"role": "subject", "text": "公司", "priority": "required"}, {"role": "action", "text": "出现", "priority": "required"}]}]})
+            # segment-001: narrative with steady density
+            write(root / "segments/segment-001/manifest.json", {"start": 120, "end": 480, "status": "drafted"})
+            write(root / "segments/segment-001/observations.json", {"observations": [observation(i, t) for i, t in enumerate((140, 210, 280, 350, 420, 478), 1)]})
+            write(root / "segments/segment-001/draft-cues.json", {"cues": []})
+            # segment-002: sparse narrative; only flagged against the narrative median, not the dense credit unit
+            write(root / "segments/segment-002/manifest.json", {"start": 120, "end": 480, "status": "drafted"})
+            write(root / "segments/segment-002/observations.json", {"observations": [observation(1, 200)]})
+            write(root / "segments/segment-002/draft-cues.json", {"cues": []})
+            drift = [x for x in MODULE.audit(root)["issues"] if x["type"] == "possible_summary_drift"]
+            self.assertEqual([x["segment"] for x in drift], ["segment-002"], drift)
+
+    def test_same_frames_different_subjects_are_not_recycled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            observations = [observation(i, t) for i, t in enumerate((0, 70, 140, 210, 280, 350, 420, 478), 1)]
+            observations[1]["evidence_frames"] = observations[0]["evidence_frames"]
+            observations[1]["subject"] = "门口的男人"
+            observations[1]["action"] = "回头看向屋内"
+            write(root / "segments/segment-001/manifest.json", {"start": 0, "end": 480, "status": "drafted"})
+            write(root / "segments/segment-001/observations.json", {"observations": observations})
+            write(root / "segments/segment-001/draft-cues.json", {"cues": []})
+            kinds = {x["type"] for x in MODULE.audit(root)["issues"]}
+            self.assertNotIn("recycled_evidence_frames", kinds)
+
+    def test_merged_provenance_and_missing_cues_fail_at_review_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+            project.update({"stage": "awaiting_user_review", "current_review_batch": {"id": "b1", "start": 0, "end": 480}})
+            write(root / "project.json", project)
+            write(root / "segments/segment-001/manifest.json", {"start": 0, "end": 480, "status": "drafted"})
+            observations = [observation(i, t) for i, t in enumerate((0, 70, 140, 210, 280, 350, 420, 478), 1)]
+            write(root / "segments/segment-001/observations.json", {"observations": observations})
+            write(root / "segments/segment-001/draft-cues.json", {"cues": [{"id": "cue-1", "start": 140, "text": "女人抬手指向屏幕。",
+                  "observation_ids": ["obs-3"], "evidence_frames": [140, 141, 142], "evidence_ids": ["frame-140", "frame-141", "frame-142"],
+                  "visual_event_time": 140, "temporal_displacement": 0, "atomic_facts": [
+                  {"role": "subject", "text": "女人", "priority": "required"}, {"role": "action", "text": "抬手指向", "priority": "required"}]}]})
+            write(root / "script/merged-draft.json", {"coverage": {"start": 0, "end": 480},
+                  "cues": [{"id": "cue-1", "start": 140, "text": "女人抬手指向屏幕。",
+                            "derivation": {"segment": "segment-001", "cue_id": "cue-9"}, "duration": 2.4}]})
+            kinds = {x["type"] for x in MODULE.audit(root)["issues"]}
+            self.assertIn("merged_cue_provenance_broken", kinds)
+
+    def test_registered_label_variant_in_cue_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+            project.update({"stage": "awaiting_user_review", "current_review_batch": {"id": "b1", "start": 0, "end": 480}})
+            write(root / "project.json", project)
+            character = json.loads((root / "bible/characters.json").read_text(encoding="utf-8"))[0]
+            character.update({"label_variants": ["红衣男子"], "first_visual_appearance": 0})
+            write(root / "bible/characters.json", {"characters": [character]})
+            write(root / "qc/identity-convergence.json", {"review_range": {"start": 0, "end": 480},
+                  "characters": [{"character_id": "c1", "resolution_status": "confirmed",
+                  "evidence_sources_checked": ["production_srt"], "cue_ids": ["cue-1"]}]})
+            write(root / "segments/segment-001/manifest.json", {"start": 0, "end": 480, "status": "drafted"})
+            observations = [observation(i, t) for i, t in enumerate((0, 70, 140, 210, 280, 350, 420, 478), 1)]
+            write(root / "segments/segment-001/observations.json", {"observations": observations})
+            write(root / "segments/segment-001/draft-cues.json", {"cues": [{"id": "cue-1", "start": 140,
+                  "text": "红衣男子抬手。", "subject_character_ids": ["c1"], "observation_ids": ["obs-3"],
+                  "evidence_frames": [140, 141, 142], "evidence_ids": ["frame-140", "frame-141", "frame-142"],
+                  "visual_event_time": 140, "temporal_displacement": 0, "atomic_facts": [
+                  {"role": "subject", "text": "李明", "priority": "required"}, {"role": "action", "text": "抬手", "priority": "required"}]},
+                  {"id": "cue-2", "start": 280, "text": "红衣男子走进巷子。", "observation_ids": ["obs-5"],
+                  "evidence_frames": [280, 281, 282], "evidence_ids": ["frame-280", "frame-281", "frame-282"],
+                  "visual_event_time": 280, "temporal_displacement": 0, "atomic_facts": [
+                  {"role": "subject", "text": "男人", "priority": "required"}, {"role": "action", "text": "走进", "priority": "required"}]}]})
+            variants = [x for x in MODULE.audit(root)["issues"] if x["type"] == "cue_contains_label_variant"]
+            self.assertEqual(len(variants), 2)
+            self.assertTrue(all(x["severity"] == "warning" for x in variants))
+
+    def test_convergence_blocks_union_covers_single_batch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+            project.update({"stage": "awaiting_user_review", "current_review_batch": {"id": "b1", "start": 0, "end": 480}})
+            write(root / "project.json", project)
+            write(root / "qc/identity-convergence.json", {"review_ranges": [
+                  {"start": 0, "end": 240}, {"start": 240, "end": 480}],
+                  "characters": [{"character_id": "c1", "resolution_status": "confirmed",
+                  "evidence_sources_checked": ["production_srt"], "cue_ids": ["cue-1"]}]})
+            ranges = [x for x in MODULE.audit(root)["issues"] if x["type"] == "identity_convergence_range_mismatch"]
+            self.assertEqual(ranges, [])
+
+    def test_convergence_blocks_with_internal_hole_fail(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+            project.update({"stage": "awaiting_user_review", "current_review_batch": {"id": "b1", "start": 0, "end": 480}})
+            write(root / "project.json", project)
+            write(root / "qc/identity-convergence.json", {"review_ranges": [
+                  {"start": 0, "end": 100}, {"start": 200, "end": 480}],
+                  "characters": [{"character_id": "c1", "resolution_status": "confirmed",
+                  "evidence_sources_checked": ["production_srt"], "cue_ids": ["cue-1"]}]})
+            mismatches = [x for x in MODULE.audit(root)["issues"] if x["type"] == "identity_convergence_range_mismatch"]
+            self.assertEqual(len(mismatches), 1)
+            self.assertTrue(mismatches[0].get("holes"))
+
+    def test_nonstandard_segment_directory_is_reported(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            (root / "segments/seg-01").mkdir(parents=True)
+            kinds = {x["type"] for x in MODULE.audit(root)["issues"]}
+            self.assertIn("nonstandard_segment_directory", kinds)
+
+    def test_principal_character_speech_timing_needs_evidence_record(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+            project["preferences"]["character_naming"] = "first_speech_once"
+            project["stage"] = "awaiting_user_review"
+            project["current_review_batch"] = {"id": "b1", "start": 0, "end": 480}
+            write(root / "project.json", project)
+            character = json.loads((root / "bible/characters.json").read_text(encoding="utf-8"))[0]
+            character.update({"first_visual_appearance": 0})
+            write(root / "bible/characters.json", {"characters": [character]})
+            kinds = {x["type"] for x in MODULE.audit(root)["issues"]}
+            self.assertIn("character_speech_timing_unestablished", kinds)
+            character["speech_evidence_reviewed"] = {"evidence_sources_checked": ["production_srt"], "result": "no_speech_in_range"}
+            write(root / "bible/characters.json", {"characters": [character]})
+            kinds = {x["type"] for x in MODULE.audit(root)["issues"]}
+            self.assertNotIn("character_speech_timing_unestablished", kinds)
+
+    def test_speech_tier_is_skipped_before_review_stage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            project = json.loads((root / "project.json").read_text(encoding="utf-8"))
+            project["preferences"]["character_naming"] = "first_speech_once"
+            write(root / "project.json", project)
+            character = json.loads((root / "bible/characters.json").read_text(encoding="utf-8"))[0]
+            write(root / "bible/characters.json", {"characters": [character]})
+            kinds = {x["type"] for x in MODULE.audit(root)["issues"]}
+            self.assertNotIn("character_speech_timing_unestablished", kinds)
+
+    def test_hash_cache_populates_and_reuses_digests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            cache = {}
+            MODULE.audit(root, cache)
+            media_key = str((root / "media/source.mp4").resolve())
+            self.assertIn(media_key, cache)
+            self.assertEqual(cache[media_key]["sha256"], hashlib.sha256(b"test-media").hexdigest())
+            first = dict(cache[media_key])
+            MODULE.audit(root, cache)
+            self.assertEqual(cache[media_key], first)
+
+    def test_fine_scene_table_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); self.make_base(root)
+            write(root / "timeline/scenes.json", {"scenes": [
+                  {"id": f"s{i}", "start": i * 10, "end": i * 10 + 8} for i in range(48)]})
+            warnings = [x for x in MODULE.audit(root)["issues"] if x["type"] == "scene_table_too_fine"]
+            self.assertEqual(len(warnings), 1)
+
 if __name__ == "__main__":
     unittest.main()

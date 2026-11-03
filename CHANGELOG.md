@@ -4,6 +4,56 @@
 
 All notable changes are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-11-03
+
+### Added
+
+- Added merge_draft.py: builds the canonical `script/merged-draft.json` from segment cues with per-cue `derivation`, coverage union, cue-overlap detection, and a `merged_edits` guard against silent rebuilds.
+- Added converge_identities.py: applies the coordinator's identity map, absorbs provisional ids, rewrites labels with the mask-first order, registers guarded `label_variants`, and emits `qc/identity-convergence.json` (single `review_range` or `review_ranges` blocks whose union covers the batch).
+- Added optimize_placement.py: executes the move → shorten → rate placement order on the merged draft and records every attempt.
+- Added continuity_editor.py: applies auditable rewrite/delete/move edits matched by cue id, never by sorted position.
+- Added contact_sheet.py: Pillow-based labeled contact sheets (avoids FFmpeg `drawtext`/`pattern_type glob` portability traps).
+- Added segment_brief.py: compact sha-free agent briefs from work packages.
+- Added merge_bible.py: `collect`/`apply` consolidation of segment bible proposals into canonical bible files.
+- Added `--script-only` to init_project.py (script-only outputs, no TTS/mix defaults) and a delivery-form question to the intake questionnaire.
+- Added hash caching (mtime+size, `qc/hash-cache.json`) to audit_project.py so multi-gigabyte sources are not re-hashed every run.
+- prepare_segment.py now validates `segment-NNN` ids, clamps near-end samples below the last decodable frame (ffprobe), retries the final sample, removes orphaned frames on `--force` rebuilds, and normalizes bible snapshots to the object-with-key shape.
+- finalize_segment.py now validates segment ids, passes `displacement_justification` through, and warns on over-displaced cues.
+- All bundled scripts reconfigure stdout/stderr to UTF-8 for Windows consoles.
+
+### Changed
+
+- `script/merged-draft.json` is now the canonical script artifact: the auditor checks dialogue restatement, summary drift, displacement, title/credit matching, identity labels, and review-file alignment against the merged cues, while segment files remain the untouched evidence layer. Merged cues must carry `derivation` provenance.
+- The density-drift gate now uses the median of narrative segments and exempts opening/end-title credit segments.
+- Recycled-evidence detection now flags only same-subject re-use; one frame may support one observation per subject.
+- `first_speech_once` mode now requires principal characters to establish `first_spoken_line_time` or record `speech_evidence_reviewed`; silent omission is an audit failure.
+- Registered `label_variants` left in cue text produce audit warnings; generic or short variants are rejected at convergence.
+- Bible files use one top-level shape (`{"characters": [...]}` ...); init/merge_bible write it, prepare normalizes it, the audit still reads legacy lists.
+- Convergence reports may split a single review batch into `review_ranges` blocks whose union covers the batch (contiguously — internal holes now fail the audit).
+- Review-stage audit errors now include repair hints; a `scene_table_too_fine` warning guards over-fine scene tables.
+- Contract changes for downstream consumers: audit reports move to `schema_version: 3`, and all bundled scripts reconfigure stdout/stderr to UTF-8 (set `PYTHONIOENCODING=utf-8` for subprocess consumers on legacy code pages).
+- optimize_placement.py executes move → shorten → rate; splitting is a coordinator decision applied through continuity_editor.py, never automatic.
+- The first-speech identity tier (`character_speech_timing_unestablished`) is enforced at review stages only.
+
+### Fixed
+
+- Segment directories named outside `segment-*` no longer silently skip the segment audit — the tools reject the naming at packaging time.
+- Merged-draft edits no longer require a fragile write-back step or fail `review_srt_text_or_id_mismatch`.
+- `displacement_justification` is now expressible end to end instead of existing only in the auditor.
+- Orphaned evidence frames from denser re-preparation are removed instead of polluting glob-based consumers.
+- Final-sample extraction no longer crashes FFmpeg's mjpeg encoder at end of stream.
+- A dense 2-minute title unit no longer inflates the film-wide drift baseline and forces padded coverage records on ending credits.
+- Fixed the final-sample retry path writing to the old filename and then reading a nonexistent path; the retried frame is now renamed before indexing.
+- Fixed mask-first label rewriting corrupting referenced characters when their labels are substrings of each other (e.g. 衬衫男人/花衬衫男人); all labels are now masked globally, longest first.
+- Fixed absorbed provisional ids surviving in cue `subject_character_ids`; convergence now rewrites them to canonical ids.
+- Fixed merge_bible `apply` overwriting canonical bible files before orphan validation completed; validation now precedes all writes.
+- Fixed the convergence-range gate accepting blocks with internal holes, and the auditor now reports nonstandard segment directories instead of silently ignoring them.
+- Fixed hash-cache entries ignoring ctime, rate adjustments leaving `review_duration`/`available_slot` stale, and contact-sheet indexes ignoring `--timestamps` overrides.
+
+### Validation
+
+- Expanded the suite with pipeline-tool tests (merge provenance, mask-first convergence, placement order, briefs, bible merge, continuity edits) and new audit-gate tests (median drift, same-frame different-subject, provenance, variants, convergence blocks, speech tiering, hash cache, fine scene tables).
+
 ## [0.5.0] - 2026-11-01
 
 ### Added

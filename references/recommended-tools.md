@@ -4,8 +4,15 @@ These are practical recommendations, not hard dependencies. Equivalent local, cl
 
 ## Bundled workflow tools
 
-- `scripts/prepare_segment.py`: default for selecting segment shots, slicing transcript context, extracting and hashing evidence frames, and creating the work package.
-- `scripts/finalize_segment.py`: default for expanding compact agent analysis into canonical observations, cues, evidence proposals, manifests, and bible proposals while computing dialogue intersections.
+- `scripts/prepare_segment.py`: default for selecting segment shots, slicing transcript context, extracting and hashing evidence frames, and creating the work package. Enforces the `segment-NNN` naming convention, clamps near-end samples below the last decodable frame, and removes orphaned frames on `--force` rebuilds.
+- `scripts/finalize_segment.py`: default for expanding compact agent analysis into canonical observations, cues, evidence proposals, manifests, and bible proposals while computing dialogue intersections. Passes `displacement_justification` through and warns on over-displaced cues.
+- `scripts/segment_brief.py`: compact agent brief (scene table, dialogue timeline, bible summary, sha-free evidence index) so agents do not parse work-package JSON.
+- `scripts/contact_sheet.py`: labeled contact sheets via Pillow; avoids FFmpeg `drawtext`/`pattern_type glob` portability traps.
+- `scripts/merge_draft.py`: builds the canonical `script/merged-draft.json` from segment cues with per-cue `derivation`; refuses to overwrite an edited draft.
+- `scripts/converge_identities.py`: applies the coordinator's identity map, absorbs provisional ids, rewrites labels with the mask-first order, and emits `qc/identity-convergence.json` (single range or `review_ranges` blocks).
+- `scripts/optimize_placement.py`: executes move → shorten → rate placement order and records attempts.
+- `scripts/continuity_editor.py`: applies auditable rewrite/delete/move edits, matched by cue id.
+- `scripts/merge_bible.py`: `collect` gathers segment bible proposals, `apply` writes the coordinator's map to canonical bible files.
 - `scripts/render_review_srt.py`: creates the review SRT and evidence map from merged cues.
 - `scripts/audit_project.py`: enforces evidence, identity, review, mix, and no-ad-hoc-code gates.
 
@@ -18,6 +25,12 @@ These tools exist so coordinating and segment agents spend their context on watc
 Use FFprobe to enumerate programs, video/audio/subtitle tracks, codecs, frame rate, sample rate, channel layout, duration, and language metadata. Use FFmpeg to extract a 16 kHz mono analysis track, keyframes/contact sheets, clips for difficult action, a narration master, and the final mix.
 
 Preserve the video stream with stream copy when compatible with the output container. Use a temporary output and verify it before promotion. FFmpeg filters such as `sidechaincompress`, `amix`, `adelay`, `asplit`, and `alimiter` are useful, but explicitly verify signal routing: the narration bus must feed both the audible mix and the ducking controller.
+
+## Windows console notes
+
+- The bundled scripts print UTF-8 JSON; on Windows consoles with a legacy code page, set `PYTHONIOENCODING=utf-8` (or `PYTHONUTF8=1`) before running them. The scripts also reconfigure stdout/stderr to UTF-8 themselves, and `--report` outputs are unaffected because reports are written as UTF-8 files.
+- FFmpeg on Windows commonly lacks `pattern_type glob` support, and `drawtext` can segfault when fontconfig is missing. Prefer the bundled Pillow-based `scripts/contact_sheet.py` (Pillow >= 11, Python >= 3.11; Pillow 13.x is current) over drawtext-based contact sheets, and pass explicit frame lists instead of glob patterns.
+- The auditor caches material/evidence hashes by mtime+size in `qc/hash-cache.json`, so re-auditing a multi-gigabyte source does not re-read it every run.
 
 ## Speech transcription and voice activity
 

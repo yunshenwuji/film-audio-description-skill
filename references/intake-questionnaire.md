@@ -13,19 +13,20 @@ First list discovered materials and ask only about ambiguous provenance or inten
 
 ## Round 1: writing
 
-1. **Description density**: medium-detailed (recommended), concise, or detailed. Medium-detailed covers characters, locations, important actions, plot-relevant expressions, and objects without narrating every visible item.
-2. **Character naming**: name once before first speech (recommended), repeat after scene changes, or only when voices are confusing. A scene-setting cue that already names the character satisfies first identification.
-3. **Expressions**: only plot-relevant or marked changes (recommended), minimal, or detailed.
-4. **Reveal policy**: preserve the film's reveal order (recommended). Never use model or actor recognition to reveal a concealed identity early.
-5. **Opening and ending titles/credits**: opening companies/title/all opening credits plus principal ending cast/crew (recommended); opening only; all ending cast; complete ending roll; user-specified names/roles; or skip. Store the exact enum and any named selection. If selected, it is binding; never reinterpret “ending” as merely saying that credits roll.
+1. **Delivery form** (ask first): script only, or full production with narration and mix. Script-only projects skip Round 2's voice, overlap, and ducking questions and initialize with script outputs (`init_project.py --script-only`).
+2. **Description density**: medium-detailed (recommended), concise, or detailed. Medium-detailed covers characters, locations, important actions, plot-relevant expressions, and objects without narrating every visible item.
+3. **Character naming**: name once before first speech (recommended), repeat after scene changes, or only when voices are confusing. A scene-setting cue that already names the character satisfies first identification.
+4. **Expressions**: only plot-relevant or marked changes (recommended), minimal, or detailed.
+5. **Reveal policy**: preserve the film's reveal order (recommended). Never use model or actor recognition to reveal a concealed identity early.
+6. **Opening and ending titles/credits**: opening companies/title/all opening credits plus principal ending cast/crew (recommended); opening only; all ending cast; complete ending roll; user-specified names/roles; or skip. Store the exact enum and any named selection. If selected, it is binding; never reinterpret “ending” as merely saying that credits roll. Every scope — including opening only — still requires the ending to be checked through the final frame (to bound the media and prove nothing opening-like appears at the end); only the opening events are narrated under that scope.
 
 ## Round 2: audio and review
 
 1. **Voice**: recommend by genre; offer the user's previous voice first when known.
 2. **Dialogue overlap**: limited overlap (recommended), avoid where possible, or prohibit.
 3. **Ducking during narration**: light with source clearly audible (recommended), medium, or strong. Duck only when narration speaks. With no narration, preserve the source at its original level regardless of whether the source contains dialogue, music, effects, ambience, or silence. Describe perceived sound rather than compressor jargon.
-4. **Outputs**: mixed film plus script; or recommend mixed film, narration master, scripts, and QC report for serious production.
-5. **Review**: for over 30 minutes recommend roughly 20-minute batches plus final merged approval; otherwise one full-script review.
+4. **Outputs**: mixed film plus script; or recommend mixed film, narration master, scripts, and QC report for serious production. Skip this question when the user chose script-only delivery in Round 1.
+5. **Review**: for over 30 minutes recommend roughly 20-minute batches plus final merged approval; otherwise one full-script review. A single full-film batch is allowed, but identity convergence then covers every character appearing anywhere in the film at once — for a large cast, convergence may be split into sub-range blocks whose union covers the batch.
 
 Ask whether to save choices as defaults only after the user chooses them. Do not silently promote a per-film choice to a durable preference.
 

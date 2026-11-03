@@ -10,7 +10,7 @@ Start from the indispensable visual change, not from a full sentence that is lat
 
 Draft in semantic units that may be removed from the end without damaging the core: “王磊夺过火石，转身冲向舱门” can become “王磊夺过火石” when the slot is short. Never compress by dropping the subject or replacing concrete action with a plot-summary label. Measure the chosen TTS voice at the intended rate; do not rely on a fixed characters-per-second estimate. If it does not fit, try in order: move into a nearby safe gap, remove lower-priority facts, split across two genuine visual moments, then modestly increase rate within the approved limit.
 
-Before compression, store atomic facts and mark required facts. A cue must retain the required subject, concrete visible action/state change, and any plot-critical object or result. “众人开始行动”“救援失败”“他们陷入危机” are not acceptable compression because they replace images with abstractions. Audit adjacent cues as a 30–60 second passage: splitting a summary into short sentences does not make it visual description. Record the visual-event time and narration displacement; action and expression cues stay close to the event unless a documented conflict forces movement. Rates above `+25%`, proper names, numbers, and dense credits require listening review even when below the absolute `+40%` ceiling.
+Before compression, store atomic facts and mark required facts. A cue must retain the required subject, concrete visible action/state change, and any plot-critical object or result. “众人开始行动”“救援失败”“他们陷入危机” are not acceptable compression because they replace images with abstractions. Audit adjacent cues as a 30–60 second passage: splitting a summary into short sentences does not make it visual description. Record the visual-event time and narration displacement; action and expression cues stay close to the event unless a documented conflict forces movement — a cue displaced more than 5 seconds from its event (15 for location changes and title credits) must carry `displacement_justification` describing that conflict. Rates above `+25%`, proper names, numbers, and dense credits require listening review even when below the absolute `+40%` ceiling.
 
 ## Describe when sound alone is insufficient
 
@@ -27,7 +27,7 @@ Do not mechanically repeat dialogue, narrate every background object, identify e
 
 Before accepting a cue, ask: **What visible information does this add that the soundtrack does not already convey?** Dialogue, subtitles, transcripts, synopses, franchise knowledge, and model memory may orient analysis, but they are not visual evidence. Do not convert audible mission briefings, broadcasts, plans, causes, or consequences into narration. Describe the visible screen, gesture, action, expression, spatial relationship, object change, or necessary on-screen text instead.
 
-Write observations before cues. A continuing action needs evidence of its beginning, process, and result rather than one isolated still. A normal cue cites the supporting observation IDs and frame timestamps. If a nonvisual editorial clarification is exceptionally needed, label it explicitly and require user review; never disguise it as observed fact.
+Write observations before cues. A continuing action needs evidence of its beginning, process, and result rather than one isolated still. A normal cue cites the supporting observation IDs and frame timestamps. One frame that shows several subjects may support one observation per subject, but the same subject reusing the same frames for a different action is evidence recycling and fails the audit. If a nonvisual editorial clarification is exceptionally needed, label it explicitly and require user review; never disguise it as observed fact.
 
 ## Naming and continuity
 
@@ -40,6 +40,10 @@ User-supplied cast photos, costume stills, and cast-role lists are high-value ca
 Keep `production_known_at` separate from `narration_allowed_after`. Do not use the canonical name in a cue before `narration_allowed_after`. Credit text shown before a deliberate story reveal may inform production but does not authorize early narration. Track the first spoken line and the first naming cue; when the user chose first-speech naming, the naming cue must precede that line without covering protected dialogue.
 
 Before an identity reveal, use the safe contemporary label such as “蒙面人” or “女医生.” Store the reveal time and switch names only after the film reveals it.
+
+Segment agents will naturally spell the same safe label several ways (“花衬衫男人”“花衬衫的男子”“背心男子”). Record those spellings as `label_variants` on the character record (at least three normalized characters, never a generic term like 男子 or 女人). Identity convergence rewrites them with a mask-first order — every OTHER character's labels are masked before a referenced character's labels are replaced — so overlapping variants (蓝袍男子/黄袍男子) or a stray 赤膊男子 can never be rewritten into the wrong person. Never hand-apply global find-and-replace across the script; it is the single easiest way to corrupt a draft.
+
+`first_spoken_line_time` is established from film-local evidence, not guessed: reliable subtitle speaker labels, an on-screen mouth/gaze/reaction chain, or a credit pairing actor and role. When no such evidence exists for a principal character, record `speech_evidence_reviewed` (what was checked) or raise an uncertainty item — omitting the field silently is a bypass, not a waiver.
 
 Neutral labels are analysis scaffolding, not a permanent writing style. Before review delivery, replace an obsolete label with the canonical name from the first narration-allowed point onward. Do not rewrite earlier cues across a deliberate reveal. Pronouns or “两人” remain natural after identification, but do not repeatedly call a confirmed character “红衣年轻人”“短发女孩” or another provisional label. If identity remains unresolved after a real evidence review, keep one stable safe label and expose the uncertainty to the user.
 
@@ -55,6 +59,8 @@ When the user selected opening/end-title description, inspect the entire opening
 - Do not treat the ending as complete until the selected credit scope has been checked through the final frame.
 
 The cue linked to an event must overlap its display interval (or document a nearby placement), use the same evidence, and contain the visible company/title/name-role content. A cue ID alone does not prove coverage.
+
+For bilingual cards, `visible_text` carries only the narration-readable line (the Chinese line); its normalized form must be a substring of the cue text. Simultaneous cards (e.g. stacked job titles) share one narration cue through the `cue_ids` list — reading every overlaid card with its own cue would make the narration speak over itself, so consolidate them in display order and let one cue satisfy several events.
 
 ## Confidence
 
